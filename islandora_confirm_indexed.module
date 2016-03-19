@@ -1,0 +1,112 @@
+<?php
+
+/**
+ * @file
+ * Defines all the hooks this module implements, and some other functions.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function islandora_confirm_indexed_menu() {
+  $items = array();
+  $items['admin/islandora/tools/confirm_indexed'] = array(
+    'title' => 'Islandora Confirm Indexed',
+    'description' => 'Configure Islandora Confirm Indexed.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('islandora_confirm_indexed_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/**
+ * Admin settings form builder.
+ */
+function islandora_confirm_indexed_admin_settings() {
+  $default_log_path = drupal_realpath(file_default_scheme() . '://');
+  $default_log_path .= '/islandora_confirm_indexed.txt';
+  $form['islandora_confirm_indexed_log_file_path'] = array(
+    '#title' => t('Log file path'),
+    '#type' => 'textfield',
+    '#size' => 60,
+    '#default_value' => variable_get('islandora_confirm_indexed_log_file_path', $default_log_path),
+    '#description' => t("Absolute file system path to the log file."),
+    '#maxlength' => 255,
+  );
+  $form['islandora_confirm_indexed_entry_delimiter'] = array(
+    '#title' => t('Log entry delimiter'),
+    '#type' => 'textfield',
+    '#size' => 5,
+    '#default_value' => variable_get('islandora_confirm_indexed_entry_delimiter', ''),
+    '#description' => t("String used to separate parts of the log entry. Leave
+      blank to use \\t (tab)."),
+    '#maxlength' => 255,
+  );
+  $form['islandora_confirm_indexed_include_timestamp'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Include timestamp'),
+    '#default_value' => variable_get('islandora_confirm_indexed_include_timestamp', 1),
+    '#description' => t('Check this option if you want to include a timestamp in the log.'),
+  );
+  return system_settings_form($form);
+}
+
+/**
+ * Implements hook_islandora_object_ingested().
+ */
+function islandora_confirm_indexed_islandora_object_ingested(FedoraObject $islandora_object) {
+  global $base_url;
+  $log_path = variable_get('islandora_confirm_indexed_log_file_path', '/tmp/islanodra_confirm_indexed.txt');
+  $entry = array();
+  $delimiter = variable_get('islandora_confirm_indexed_entry_delimiter', '');
+
+  $entry[] = islandora_confirm_indexed_query_solr($islandora_object->id);
+
+  if (variable_get('islandora_confirm_indexed_include_timestamp', 1)) {
+    array_unshift($entry, date("Y-m-d H:i:s"));
+  }
+
+  if (!strlen($delimiter)) {
+    $entry_string = implode("\t", $entry) . "\n";
+  }
+  else {
+    $entry_string = implode($delimiter, $entry) . "\n";
+  }
+  file_put_contents($log_path, $entry_string, FILE_APPEND);
+}
+
+/**
+ * Queries Islandora's Solr index to get a list of PIDs.
+ *
+ * The object is the one corresponding to the alias and pointer.
+ *
+ * @param string $query
+ *   The query to send to Solr.
+ *
+ * @return array
+ *   An array containing all of the PIDs matching $query.
+ */
+function islandora_confirm_indexed_query_solr($pid) {
+  if (is_null($pid)) {
+    return FALSE;
+  }
+  $solr_url = variable_get('islandora_solr_url', 'http://localhost:8080/solr');
+  if (!preg_match('#^http://#', $solr_url)) {
+    $solr_url = 'http://' . $solr_url;
+  }
+  $pid = preg_replace('/:/', '\:', $pid);
+  $pid_query = $solr_url . '/select?version=1.2&rows=1&wt=json&json.nl=map&fl=PID&q=PID:' . $pid;
+  $raw_result = drupal_http_request($pid_query);
+  if ($raw_result->code != 200) {
+    return FALSE;
+  }
+  $query_result = json_decode($raw_result->data);
+  if ($query_result->response->numFound < 1) {
+    return FALSE;
+  }
+
+  return $query_result->response->docs[0]->PID;
+}
+
