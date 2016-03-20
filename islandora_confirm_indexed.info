@@ -2,5 +2,6 @@ name = "Islandora Confirm Indexed"
 description = "Confirms that an Islandora object was indexed on ingest."
 package = Islandora Tools
 dependencies[] = islandora
+dependencies[] = islandora_solr
 core = 7.x
 configure = admin/islandora/tools/confirm_ingest

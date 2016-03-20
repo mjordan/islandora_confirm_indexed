@@ -35,6 +35,16 @@ function islandora_confirm_indexed_admin_settings() {
     '#description' => t("Absolute file system path to the log file."),
     '#maxlength' => 255,
   );
+  $form['islandora_confirm_indexed_pid_offset'] = array(
+    '#title' => t('PID offset'),
+    '#type' => 'textfield',
+    '#size' => 5,
+    '#default_value' => variable_get('islandora_confirm_indexed_pid_offset', '5'),
+    '#description' => t("Difference between the PID of the object beinig ingested
+      and the one to query. For example, when object with PID foo:10 us ingested,
+      PID foo:5 will be queried."),
+    '#maxlength' => 255,
+  );
   $form['islandora_confirm_indexed_entry_delimiter'] = array(
     '#title' => t('Log entry delimiter'),
     '#type' => 'textfield',
@@ -50,6 +60,12 @@ function islandora_confirm_indexed_admin_settings() {
     '#default_value' => variable_get('islandora_confirm_indexed_include_timestamp', 1),
     '#description' => t('Check this option if you want to include a timestamp in the log.'),
   );
+  $form['islandora_confirm_indexed_include_success'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Include positive queries'),
+    '#default_value' => variable_get('islandora_confirm_indexed_include_success', 1),
+    '#description' => t('Check this option if you want to include the results of positive queries in the log.'),
+  );
   return system_settings_form($form);
 }
 
@@ -57,12 +73,36 @@ function islandora_confirm_indexed_admin_settings() {
  * Implements hook_islandora_object_ingested().
  */
 function islandora_confirm_indexed_islandora_object_ingested(FedoraObject $islandora_object) {
-  global $base_url;
   $log_path = variable_get('islandora_confirm_indexed_log_file_path', '/tmp/islanodra_confirm_indexed.txt');
   $entry = array();
   $delimiter = variable_get('islandora_confirm_indexed_entry_delimiter', '');
+  $offset = variable_get('islandora_confirm_indexed_pid_offset', '5');
 
-  $entry[] = islandora_confirm_indexed_query_solr($islandora_object->id);
+  // PIDs increment, so we look for a PID with a lower number than
+  // the current one.
+  list($namespace, $number) = explode(':', $islandora_object->id);
+  // But if we go below 0, just return.
+  $number = $number - $offset;
+  if ($number < 1) {
+    return;
+  }
+
+  $found = islandora_confirm_indexed_query_solr($namespace, $number);
+  if (!$found) {
+    $entry[] = 'Not indexed';
+    $entry[] = $islandora_object->id;
+  }
+  if (preg_match('/^\d\d\d$/', $found)) {
+    $entry[] = 'Error';
+    $entry[] = 'HTTP response ' . $found .
+      ' (' . $islandora_object->id . ')';
+  }
+  if (variable_get('islandora_confirm_indexed_include_success', 1)) {
+    if ($found == $islandora_object->id) {
+      $entry[] = 'Indexed';
+      $entry[] = $islandora_object->id;
+    }
+  }
 
   if (variable_get('islandora_confirm_indexed_include_timestamp', 1)) {
     array_unshift($entry, date("Y-m-d H:i:s"));
@@ -82,31 +122,31 @@ function islandora_confirm_indexed_islandora_object_ingested(FedoraObject $islan
  *
  * The object is the one corresponding to the alias and pointer.
  *
- * @param string $query
- *   The query to send to Solr.
+ * @param string $namespace
+ *   The namespace in the PID to query Solr for.
+ * @param string $number
+ *   The namespace in the PID to query Solr for.
  *
- * @return array
- *   An array containing all of the PIDs matching $query.
+ * @return string|bool
+ *   TRUE is the pid was found, false if not, the error code
+ *   if Solr returned an HTTP response other than 200.
  */
-function islandora_confirm_indexed_query_solr($pid) {
-  if (is_null($pid)) {
-    return FALSE;
-  }
+function islandora_confirm_indexed_query_solr($namespace, $number) {
+  $pid = $namespace . '\:' . $number;
   $solr_url = variable_get('islandora_solr_url', 'http://localhost:8080/solr');
   if (!preg_match('#^http://#', $solr_url)) {
     $solr_url = 'http://' . $solr_url;
   }
-  $pid = preg_replace('/:/', '\:', $pid);
   $pid_query = $solr_url . '/select?version=1.2&rows=1&wt=json&json.nl=map&fl=PID&q=PID:' . $pid;
   $raw_result = drupal_http_request($pid_query);
   if ($raw_result->code != 200) {
-    return FALSE;
+    return $raw_result->code;
   }
   $query_result = json_decode($raw_result->data);
-  if ($query_result->response->numFound < 1) {
+  if ($query_result->response->numFound == 1) {
+    return $query_result->response->docs[0]->PID;
+  }
+  else {
     return FALSE;
   }
-
-  return $query_result->response->docs[0]->PID;
 }
-
