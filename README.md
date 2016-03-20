@@ -9,6 +9,10 @@ When an object is ingested, this module queries Solr to see if an existing objec
 ```
 [timestamp]    Not indexed    PID
 [timestamp]    Error    HTTP response code (PID)
+```
+There is a config option to also log successful queries, in which case the log entries will look like this:
+
+```
 [timestamp]    Indexed    PID
 ```
 
@@ -29,7 +33,7 @@ If you get false reports that an object is not indexed during batch ingests, you
 
 ## Usage
 
-If this module is enabled, it will query Solr to confirm that a newly ingested object has been indexed, and if it does not find the object, it logs that result.
+This module is intended to be enabled and use during large batch ingests to detect whether Fgsearch fails to index objects. It should probably be disabled on production Islandora instances (although will not cause any harm if it is not).
 
 ## License
 
@@ -37,4 +41,4 @@ GPL3
 
 ## Maintainer
 
-* Mark Jordan
+Mark Jordan
