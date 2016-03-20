@@ -39,10 +39,11 @@ function islandora_confirm_indexed_admin_settings() {
     '#title' => t('PID offset'),
     '#type' => 'textfield',
     '#size' => 5,
-    '#default_value' => variable_get('islandora_confirm_indexed_pid_offset', '5'),
+    '#default_value' => variable_get('islandora_confirm_indexed_pid_offset', '10'),
     '#description' => t("Difference between the PID of the object beinig ingested
-      and the one to query. For example, when object with PID foo:10 us ingested,
-      PID foo:5 will be queried."),
+      and the one to query. For example, when object with PID foo:20 is ingested,
+      PID foo:10 will be queried. We use this offset to ensure that the Solr
+      indexing is complete before we issue the confirmation query."),
     '#maxlength' => 255,
   );
   $form['islandora_confirm_indexed_entry_delimiter'] = array(
@@ -64,7 +65,9 @@ function islandora_confirm_indexed_admin_settings() {
     '#type' => 'checkbox',
     '#title' => t('Include positive queries'),
     '#default_value' => variable_get('islandora_confirm_indexed_include_success', 1),
-    '#description' => t('Check this option if you want to include the results of positive queries in the log.'),
+    '#description' => t('Check this option if you want to include the results of
+      positive queries in the log. Leave unchecked to log only negative queries
+      (queries that did not find an object in the Solr index).'),
   );
   return system_settings_form($form);
 }
@@ -89,18 +92,22 @@ function islandora_confirm_indexed_islandora_object_ingested(FedoraObject $islan
 
   $found = islandora_confirm_indexed_query_solr($namespace, $number);
   if (!$found) {
-    $entry[] = 'Not indexed';
-    $entry[] = $islandora_object->id;
+    // If it's not found, confirm that the object exists before reporting
+    // that it wasn't indexed.
+    if ($object_to_query = islandora_object_load($namespace . ':' . $number)) {
+      $entry[] = 'Not indexed';
+      $entry[] = $namespace . ':' . $number;
+    }
   }
   if (preg_match('/^\d\d\d$/', $found)) {
     $entry[] = 'Error';
     $entry[] = 'HTTP response ' . $found .
-      ' (' . $islandora_object->id . ')';
+      ' (' . $namespace . ':' . $number . ')';
   }
   if (variable_get('islandora_confirm_indexed_include_success', 1)) {
-    if ($found == $islandora_object->id) {
+    if ($found == $namespace . ':' . $number) {
       $entry[] = 'Indexed';
-      $entry[] = $islandora_object->id;
+      $entry[] = $namespace . ':' . $number;
     }
   }
 
@@ -114,7 +121,11 @@ function islandora_confirm_indexed_islandora_object_ingested(FedoraObject $islan
   else {
     $entry_string = implode($delimiter, $entry) . "\n";
   }
-  file_put_contents($log_path, $entry_string, FILE_APPEND);
+
+  // Don't write log entries that are empty or just have a timestamp.
+  if (count($entry) > 1) {
+    file_put_contents($log_path, $entry_string, FILE_APPEND);
+  }
 }
 
 /**
@@ -128,7 +139,7 @@ function islandora_confirm_indexed_islandora_object_ingested(FedoraObject $islan
  *   The namespace in the PID to query Solr for.
  *
  * @return string|bool
- *   TRUE is the pid was found, false if not, the error code
+ *   TRUE if the pid was found, FALSE if not, the error code
  *   if Solr returned an HTTP response other than 200.
  */
 function islandora_confirm_indexed_query_solr($namespace, $number) {
