@@ -16,7 +16,7 @@ There is a config option to also log successful queries, in which case the log e
 [timestamp]    Indexed    PID
 ```
 
-The module uses a "PID offset" to determine which PID it queries Solr for. In other words, it doesn't query Solr for the PID of the current object being ingested, it queries Solr using the PID that is a few integers (the value of the offset) lower than the PID of the object being ingested. It needs to do this because the indexing operation for the current object is not yet complete when the module queries Solr. The ingestion of an object is used solely as the trigger to issue a query that confirms that an already existing object (with a PID n - offset) has been indexed.
+The module uses a "PID offset" to determine which PID it queries Solr for. In other words, it doesn't query Solr for the PID of the current object being ingested, it queries Solr using the PID that is a few integers (the value of the offset) lower than the PID of the object being ingested. It does this because the indexing operations for the current object are not yet complete when the module queries Solr. The ingestion of an object is used solely as the trigger to issue a query that confirms that an already existing object (whose PID is equal to the PID of the current object minus the PID offset) has been indexed.
 
 In practice, using this offset means that at the end of a batch ingest, a number of objects will not have been queried to confirm that they have been indexed in Solr and must be tested manually. This number of objects will be equal to the PID offset and will have PIDs ranging from the PID of the last object ingested to the PID of the last object ingested minus the offset. However, during consecutive batch ingests using the same namespace, the set of objects that were not tested during the previous batch ingest will be tested during succeeding batch ingest, so manual confirmation that they have been indexed will not be necessary.
 
@@ -33,7 +33,7 @@ If you get false reports that an object is not indexed during batch ingests, you
 
 ## Usage
 
-This module is intended to be enabled and use during large batch ingests to detect whether Fgsearch fails to index objects. It should probably be disabled on production Islandora instances (although will not cause any harm if it is not).
+This module is intended to be enabled during large batch ingests to detect whether Fgsearch fails to index objects. It should probably be disabled on production Islandora instances (although will not cause any harm if it is not).
 
 ## License
 
