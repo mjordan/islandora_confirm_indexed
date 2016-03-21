@@ -22,7 +22,7 @@ In practice, using this offset means that at the end of a batch ingest, a number
 
 ## Installation
 
-* git clone git@git.lib.sfu.ca:mjordan/islandora_confirm_indexed.git
+* git clone http://git.lib.sfu.ca/mjordan/islandora_confirm_indexed.git
 * drush -y en islandora_confirm_indexed
 
 ## Configuration
