@@ -2,7 +2,7 @@
 
 ## Overview
 
-This utility module queries the Islandora Solr index when an object is ingested to confirm that it has been indexed in Solr. Developed as part of QA checks for a large migration, where FedoraGsearch was found to fail to index some objects on during batch ingest. Only works with default auto-increment PIDS, not UUID PIDs.
+This utility module queries the Islandora Solr index for a specific PID to confirm that the object the PID identifies has been indexed in Solr. Developed as part of QA checks for a large migration, where FedoraGsearch was found to fail to index some objects on during batch ingest. Only works with default auto-increment PIDS, not UUID PIDs.
 
 When an object is ingested, this module queries Solr to see if an existing object's PID is retrieved. If it isn't, the result of the query is logged. If Solr responds with a non-200 HTTP response code, the code and the PID are logged, as illustrated below:
 
