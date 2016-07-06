@@ -24,7 +24,7 @@ The module also provides a drush script for querying a list of PIDs to determine
 
 ## Installation
 
-* git clone http://git.lib.sfu.ca/mjordan/islandora_confirm_indexed.git
+* git clone https://github.com/mjordan/islandora_confirm_indexed
 * drush -y en islandora_confirm_indexed
 
 ## Configuration
