@@ -20,6 +20,8 @@ The module uses a "PID offset" to determine which PID it queries Solr for. In ot
 
 In practice, using this offset means that at the end of a batch ingest, a number of objects will not have been queried to confirm that they have been indexed in Solr and must be tested manually. This number of objects will be equal to the PID offset and will have PIDs ranging from the PID of the last object ingested to the PID of the last object ingested minus the offset. However, during consecutive batch ingests using the same namespace, the set of objects that were not tested during the previous batch ingest will be tested during succeeding batch ingest, so manual confirmation that they have been indexed will not be necessary.
 
+The module also provides a drush script for querying a list of PIDs to determine if they are indexed in Solr. Details on its usage are provided below.
+
 ## Installation
 
 * git clone http://git.lib.sfu.ca/mjordan/islandora_confirm_indexed.git
@@ -33,7 +35,11 @@ If you get false reports that an object is not indexed during batch ingests, you
 
 ## Usage
 
-This module is intended to be enabled during large batch ingests to detect whether Fgsearch fails to index objects. It should probably be disabled on production Islandora instances (although will not cause any harm if it is not).
+This module is intended to be enabled during large batch ingests to detect whether Fgsearch fails to index objects. It should probably be disabled on production Islandora instances (although it will not cause any harm if it is not).
+
+The drush command `drush islandora_confirm_indexed --pid_file=/tmp/pids.txt --unindexed_log=/tmp/unindexed.log` will read the contents of the file at `--pid_file` and query each PID in Solr, writing out the PIDs of objects that it can't find to the file specified at `--unindexed_log`.
+
+The input PID file must contain one PID per line. The output log file will also contain one PID per line.
 
 ## License
 
